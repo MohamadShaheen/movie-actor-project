@@ -45,7 +45,6 @@ def get_popular_movies(pages: int):
                 "genres": ','.join([str(genre_id) for genre_id in movie["genre_ids"]]),
                 "overview": movie["overview"],
                 "poster_path": movie["poster_path"],
-                "actors": get_actors(movie["id"])
             })
 
         movies.extend(movies_per_page)
