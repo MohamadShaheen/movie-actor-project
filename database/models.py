@@ -1,5 +1,5 @@
 from sqlalchemy.orm import relationship
-from mysql_connection import Base
+from database.mysql_connection import Base, engine
 from sqlalchemy import Column, Integer, String, ForeignKey, DateTime, Float, Boolean
 
 
@@ -7,14 +7,14 @@ class Movie(Base):
     __tablename__ = "movies"
 
     id = Column(Integer, primary_key=True, autoincrement=False)
-    title = Column(String(50))
+    title = Column(String(255))
     language = Column(String(5))
     popularity = Column(Float)
     release_date = Column(DateTime)
     adult = Column(Boolean)
     genres = Column(String(50))
-    overview = Column(String(500))
-    poster_path = Column(String(100))
+    overview = Column(String(1000))
+    poster_path = Column(String(255))
 
     actors = relationship("Actor", secondary="movies_actors", back_populates="movies")
 

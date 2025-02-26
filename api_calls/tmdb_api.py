@@ -20,6 +20,7 @@ def get_popular_movies(pages: int):
         print("Invalid input - pages number must be less than 20")
         return []
 
+    genres = get_genres()
     # Base URL
     url = f"https://api.themoviedb.org/3/movie/popular?language=en-US&page="
 
@@ -42,9 +43,10 @@ def get_popular_movies(pages: int):
                 "popularity": movie["popularity"],
                 "release_date": movie["release_date"],
                 "adult": movie["adult"],
-                "genres": ','.join([str(genre_id) for genre_id in movie["genre_ids"]]),
+                "genres": ','.join([genres[genre_id] for genre_id in movie["genre_ids"]]),
                 "overview": movie["overview"],
                 "poster_path": movie["poster_path"],
+                "actors": get_actors(movie["id"]),
             })
 
         movies.extend(movies_per_page)
@@ -71,3 +73,14 @@ def get_actors(movie_id: int):
         })
 
     return actors
+
+
+def get_genres():
+    url = "https://api.themoviedb.org/3/genre/movie/list?language=en"
+    response = requests.get(url, headers=headers).json()["genres"]
+    genres = {}
+
+    for genre in response:
+        genres[genre["id"]] = genre["name"]
+
+    return genres
