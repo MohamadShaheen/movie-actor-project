@@ -1,167 +1,166 @@
-import json
 from datetime import datetime
 from sqlalchemy import extract
 from fastapi import HTTPException
 from fastapi.encoders import jsonable_encoder
 from database.mysql_connection import SessionLocal
-from database.models import Movie, Actor, MovieActor
+from db_access_layer.actor import add_actor_general
+from database.models import Movie, MovieActor
+
+session = SessionLocal()
 
 
-class MovieInteractor:
-    def __init__(self):
-        self.session = SessionLocal()
+def get_movies_ids():
+    movies_ids = session.query(Movie.id).all()
+    session.close()
 
-    def get_movies_ids(self):
-        movies_ids = self.session.query(Movie.id).all()
+    if not movies_ids:
+        raise HTTPException(status_code=404, detail="Movies not found")
 
-        if not movies_ids:
-            self.session.close()
-            raise HTTPException(status_code=404, detail="Movies not found")
+    return [movie[0] for movie in movies_ids]
 
-        return [movie[0] for movie in movies_ids]
 
-    def get_movies_titles(self):
-        movies_titles = self.session.query(Movie.title).all()
+def get_movies_titles():
+    movies_titles = session.query(Movie.title).all()
+    session.close()
 
-        if not movies_titles:
-            self.session.close()
-            raise HTTPException(status_code=404, detail="Movies not found")
+    if not movies_titles:
+        raise HTTPException(status_code=404, detail="Movies not found")
 
-        return [title[0] for title in movies_titles]
+    return [title[0] for title in movies_titles]
 
-    def get_movie_by_id(self, movie_id: int):
-        movie_db = self.session.query(Movie).filter(Movie.id == movie_id).first()
+
+def get_movie_by_id(movie_id: int):
+    movie_db = session.query(Movie).filter(Movie.id == movie_id).first()
+    session.close()
+
+    if not movie_db:
+        raise HTTPException(status_code=404, detail="Movie not found")
+
+    return jsonable_encoder(movie_db)
+
+
+def get_movie_by_title(movie_title: str):
+    movie_db = session.query(Movie).filter(Movie.title.ilike(movie_title)).first()
+    session.close()
+
+    if not movie_db:
+        raise HTTPException(status_code=404, detail="Movie not found")
+
+    return jsonable_encoder(movie_db)
+
+
+def get_movies_with_popularity_over(popularity: float):
+    movies_db = session.query(Movie).filter(Movie.popularity > popularity).all()
+    session.close()
+
+    if not movies_db:
+        raise HTTPException(status_code=404, detail="No movies found")
+
+    return [{"id": movie.id, "title": movie.title, "popularity": movie.popularity} for movie in movies_db]
+
+
+def get_movies_with_popularity_less(popularity: float):
+    movies_db = session.query(Movie).filter(Movie.popularity < popularity).all()
+    session.close()
+
+    if not movies_db:
+        raise HTTPException(status_code=404, detail="No movies found")
+
+    return [{"id": movie.id, "title": movie.title, "popularity": movie.popularity} for movie in movies_db]
+
+
+def get_movies_by_genre(genre: str):
+    movies_db = session.query(Movie).filter(Movie.genres.contains(genre.lower().capitalize())).all()
+    session.close()
+
+    if not movies_db:
+        raise HTTPException(status_code=404, detail="No movies found")
+
+    return [{"id": movie.id, "title": movie.title, "genres": movie.genres.split(",")} for movie in movies_db]
+
+
+def get_movies_released_after(year: int):
+    movies_db = session.query(Movie).filter(extract("year", Movie.release_date) >= year).all()
+    session.close()
+
+    if not movies_db:
+        raise HTTPException(status_code=404, detail="No movies found")
+
+    return [{"id": movie.id, "title": movie.title, "release_date": movie.release_date} for movie in movies_db]
+
+
+def get_movies_released_before(year: int):
+    movies_db = session.query(Movie).filter(extract("year", Movie.release_date) <= year).all()
+    session.close()
+
+    if not movies_db:
+        raise HTTPException(status_code=404, detail="No movies found")
+
+    return [{"id": movie.id, "title": movie.title, "release_date": movie.release_date.strftime("%Y-%m-%d")} for movie in
+            movies_db]
+
+
+def add_movies(movies):
+    counter = 0
+
+    for movie in movies:
+        movie_db = session.query(Movie).filter(Movie.id == movie["id"]).first()
 
         if not movie_db:
-            self.session.close()
-            raise HTTPException(status_code=404, detail="Movie not found")
+            counter += 1
+            session.add(Movie(id=movie["id"], title=movie["title"], language=movie["language"],
+                              popularity=movie["popularity"],
+                              release_date=datetime.strptime(movie["release_date"], "%Y-%m-%d"),
+                              adult=movie["adult"], genres=movie["genres"], overview=movie["overview"],
+                              poster_path=movie["poster_path"]))
+            session.commit()
 
-        return jsonable_encoder(movie_db)
+        for actor in movie["actors"]:
+            add_actor_general(actor)
 
-    def get_movie_by_title(self, movie_title: str):
-        movie_db = self.session.query(Movie).filter(Movie.title.ilike(movie_title)).first()
+            movie_actor_db = session.query(MovieActor).filter(MovieActor.movie_id == movie["id"],
+                                                              MovieActor.actor_id == actor[
+                                                                  "id"]).first()
 
-        if not movie_db:
-            self.session.close()
-            raise HTTPException(status_code=404, detail="Movie not found")
+            if not movie_actor_db:
+                session.add(MovieActor(movie_id=movie["id"], actor_id=actor["id"]))
 
-        return jsonable_encoder(movie_db)
+        session.commit()
 
-    def get_movies_with_popularity_over(self, popularity: float):
-        movies_db = self.session.query(Movie).filter(Movie.popularity > popularity).all()
+    session.close()
+    return f"{counter} movies out of {len(movies)} were added"
 
-        movies = []
 
-        for movie in movies_db:
-            movies.append({"id": movie.id, "title": movie.title, "popularity": movie.popularity})
+def add_movie(movie):
+    response = add_movies([movie])
 
-        return movies
+    if "0" in response.split():
+        raise HTTPException(status_code=409, detail="Movie already exists")
 
-    def get_movies_with_popularity_less(self, popularity: float):
-        movies_db = self.session.query(Movie).filter(Movie.popularity < popularity).all()
+    return f"Movie {movie["id"]} added successfully"
 
-        movies = []
 
-        for movie in movies_db:
-            movies.append({"id": movie.id, "title": movie.title, "popularity": movie.popularity})
+def delete_movies(movies_ids):
+    counter = 0
 
-        return movies
+    for movie_id in movies_ids:
+        movie_db = session.query(Movie).filter(Movie.id == movie_id).first()
 
-    def get_movies_by_genre(self, genre: str):
-        movies_db = self.session.query(Movie).filter(Movie.genres.contains(genre.lower().capitalize())).all()
+        if movie_db:
+            counter += 1
 
-        movies = []
+            session.delete(movie_db)
+            session.commit()
 
-        for movie in movies_db:
-            movies.append({"id": movie.id, "title": movie.title, "genres": movie.genres.split(",")})
+    session.close()
 
-        return movies
+    return f"{counter} movies out of {len(movies_ids)} were deleted"
 
-    def get_movies_released_after(self, year: int):
-        movies_db = self.session.query(Movie).filter(extract("year", Movie.release_date) >= year).all()
 
-        movies = []
+def delete_movie(movie_id):
+    response = delete_movies([movie_id])
 
-        for movie in movies_db:
-            movies.append({"id": movie.id, "title": movie.title, "release_date": movie.release_date})
+    if "0" in response.split():
+        raise HTTPException(status_code=404, detail="Movie not found")
 
-        return movies
-
-    def get_movies_released_before(self, year: int):
-        movies_db = self.session.query(Movie).filter(extract("year", Movie.release_date) <= year).all()
-
-        movies = []
-
-        for movie in movies_db:
-            movies.append(
-                {"id": movie.id, "title": movie.title, "release_date": movie.release_date.strftime("%Y-%m-%d")})
-
-        return movies
-
-    def add_movie(self, movie):
-        response = self.add_movies([movie])
-
-        if "0" in response.split():
-            raise HTTPException(status_code=409, detail="Movie already exists")
-
-        return f"Movie {movie["id"]} added successfully"
-
-    def add_movies(self, movies):
-        counter = 0
-
-        for movie in movies:
-            movie_db = self.session.query(Movie).filter(Movie.id == movie["id"]).first()
-
-            if not movie_db:
-                counter += 1
-                self.session.add(Movie(id=movie["id"], title=movie["title"], language=movie["language"],
-                                       popularity=movie["popularity"],
-                                       release_date=datetime.strptime(movie["release_date"], "%Y-%m-%d"),
-                                       adult=movie["adult"], genres=movie["genres"], overview=movie["overview"],
-                                       poster_path=movie["poster_path"]))
-                self.session.commit()
-
-            for actor in movie["actors"]:
-                actor_db = self.session.query(Actor).filter(Actor.id == actor["id"]).first()
-
-                if not actor_db:
-                    self.session.add(Actor(id=actor["id"], name=actor["name"],
-                                           gender=actor["gender"], adult=actor["adult"],
-                                           popularity=actor["popularity"], profile_path=actor["profile_path"]))
-
-                    self.session.commit()
-
-                movie_actor_db = self.session.query(MovieActor).filter(MovieActor.movie_id == movie["id"],
-                                                                       MovieActor.actor_id == actor[
-                                                                           "id"]).first()
-
-                if not movie_actor_db:
-                    self.session.add(MovieActor(movie_id=movie["id"], actor_id=actor["id"]))
-
-            self.session.commit()
-            self.session.close()
-
-        return f"{counter} movies out of {len(movies)} were added"
-
-    def delete_movie(self, movie_id):
-        response = self.delete_movies([movie_id])
-
-        if "0" in response.split():
-            raise HTTPException(status_code=404, detail="Movie not found")
-
-        return f"{movie_id} was deleted"
-
-    def delete_movies(self, movies_ids):
-        counter = 0
-
-        for movie_id in movies_ids:
-            movie_db = self.session.query(Movie).filter(Movie.id == movie_id).first()
-
-            if movie_db:
-                counter += 1
-
-                self.session.delete(movie_db)
-                self.session.commit()
-                self.session.close()
-
-        return f"{counter} movies out of {len(movies_ids)} were deleted"
+    return f"{movie_id} was deleted"
