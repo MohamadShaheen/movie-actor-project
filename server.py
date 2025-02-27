@@ -1,6 +1,6 @@
 import os
 import logging
-from routers import movies, actors
+from routers import movies, actors, movie_actor
 from fastapi import FastAPI, Request
 
 if not os.path.exists('logs'):
@@ -39,3 +39,4 @@ async def root(request: Request):
 
 app.include_router(movies.router, prefix="/movies", tags=["movies"])
 app.include_router(actors.router, prefix="/actors", tags=["actors"])
+app.include_router(movie_actor.router, prefix="/movie-actor", tags=["movie and actor"])
