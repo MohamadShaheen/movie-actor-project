@@ -1,6 +1,9 @@
 from datetime import datetime
 from sqlalchemy import extract
 from fastapi import HTTPException
+
+import database.mongodb_connection
+from api_calls.tmdb_api import get_movie_poster
 from database.models import Movie, MovieActor
 from fastapi.encoders import jsonable_encoder
 from database.mysql_connection import SessionLocal
@@ -100,6 +103,45 @@ def get_movies_released_before(year: int):
             movies_db]
 
 
+def get_movie_poster(movie_id: int):
+    collection = database.mongodb_connection.database["movies_posters"]
+    movie_db = collection.find_one({"_id": movie_id})
+
+    if not movie_db:
+        raise HTTPException(status_code=404, detail="Movie poster not found")
+
+    return movie_db["image"]
+
+
+def add_movies_poster(movies_ids):
+    counter = 0
+    collection = database.mongodb_connection.database["movies_posters"]
+
+    for movie_id in movies_ids:
+        movie_db = collection.find_one({"_id": movie_id})
+
+        if not movie_db:
+            mysql_movie_poster_path = session.query(Movie.poster_path).filter(Movie.id == movie_id).first()[0]
+            counter += 1
+
+            collection.insert_one({
+                "_id": movie_id,
+                "poster_path": mysql_movie_poster_path,
+                "image": get_movie_poster(mysql_movie_poster_path)
+            })
+
+    return f"{counter} posters out of {len(movies_ids)} were added"
+
+
+def add_movie_poster(movie_id: int):
+    response = add_movies_poster([movie_id])
+
+    if "0" in response.split():
+        raise HTTPException(status_code=409, detail="Movie already exists")
+
+    return f"Movie {movie_id} poster added successfully"
+
+
 def add_movies(movies):
     counter = 0
 
@@ -126,6 +168,7 @@ def add_movies(movies):
                 session.add(MovieActor(movie_id=movie["id"], actor_id=actor["id"]))
 
         session.commit()
+        add_movies_poster([movie["id"]])
 
     session.close()
     return f"{counter} movies out of {len(movies)} were added"
@@ -137,7 +180,30 @@ def add_movie(movie):
     if "0" in response.split():
         raise HTTPException(status_code=409, detail="Movie already exists")
 
+    add_movies_poster([movie["id"]])
     return f"Movie {movie["id"]} added successfully"
+
+
+def delete_movies_poster(movies_ids):
+    counter = 0
+    collection = database.mongodb_connection.database["movies_posters"]
+
+    for movie_id in movies_ids:
+        result = collection.delete_one({"_id": movie_id})
+
+        if result.deleted_count > 0:
+            counter += 1
+
+    return f"{counter} posters out of {len(movies_ids)} were deleted"
+
+
+def delete_movie_poster(movie_id: int):
+    response = delete_movies_poster([movie_id])
+
+    if "0" in response.split():
+        raise HTTPException(status_code=404, detail="Movie does not exist")
+
+    return f"Movie {movie_id} poster deleted successfully"
 
 
 def delete_movies(movies_ids):
@@ -154,13 +220,15 @@ def delete_movies(movies_ids):
 
     session.close()
 
+    delete_movies_poster(movies_ids)
     return f"{counter} movies out of {len(movies_ids)} were deleted"
 
 
-def delete_movie(movie_id):
+def delete_movie(movie_id: int):
     response = delete_movies([movie_id])
 
     if "0" in response.split():
         raise HTTPException(status_code=404, detail="Movie not found")
 
+    delete_movies_poster([movie_id])
     return f"{movie_id} was deleted"

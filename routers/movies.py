@@ -1,7 +1,7 @@
 import re
 from typing import List
 from db_access_layer import movies
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Response
 
 router = APIRouter()
 
@@ -83,6 +83,15 @@ async def get_movies_released_before(year: int):
     try:
         response = movies.get_movies_released_before(year)
         return response
+    except HTTPException as err:
+        raise err
+
+
+@router.get("/movie-poster/")
+async def get_movie_poster(movie_id: int):
+    try:
+        response = movies.get_movie_poster(movie_id)
+        return Response(content=response, media_type="image/jpg")
     except HTTPException as err:
         raise err
 

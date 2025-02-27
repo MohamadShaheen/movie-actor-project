@@ -1,5 +1,7 @@
 import os
+from io import BytesIO
 import requests
+from bson import Binary
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -84,3 +86,17 @@ def get_genres():
         genres[genre["id"]] = genre["name"]
 
     return genres
+
+
+def get_movie_poster(movie_poster_path: str):
+    if movie_poster_path == "":
+        return None
+
+    url = "https://image.tmdb.org/t/p/original" + movie_poster_path
+
+    response = requests.get(url)
+
+    if response.status_code == 200:
+        return Binary(response.content)
+    else:
+        return None
