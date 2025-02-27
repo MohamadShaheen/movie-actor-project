@@ -135,7 +135,7 @@ def delete_actors(actors_ids):
     return f"{counter} actors out of {len(actors_ids)} were deleted"
 
 
-def delete_movie(actor_id):
+def delete_actor(actor_id):
     response = delete_actors([actor_id])
 
     if "0" in response.split():

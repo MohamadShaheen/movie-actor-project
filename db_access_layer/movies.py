@@ -4,7 +4,7 @@ from fastapi import HTTPException
 from database.models import Movie, MovieActor
 from fastapi.encoders import jsonable_encoder
 from database.mysql_connection import SessionLocal
-from db_access_layer.actor import add_actor_general
+from db_access_layer.actors import add_actor_general
 
 session = SessionLocal()
 

@@ -107,9 +107,18 @@ async def add_movie(id: int, title: str, language: str, popularity: float, relea
             raise HTTPException(status_code=400,
                                 detail="Invalid genres format. Use comma-separated words like 'Action,Comedy'")
 
-        response = movies.add_movie(
-            {"id": id, "title": title, "language": language, "popularity": popularity, "release_date": release_date,
-             "adult": adult, "genres": genres, "overview": overview, "poster_path": poster_path, "actors": []})
+        response = movies.add_movie({
+            "id": id,
+            "title": title,
+            "language": language,
+            "popularity": popularity,
+            "release_date": release_date,
+            "adult": adult,
+            "genres": genres,
+            "overview": overview,
+            "poster_path": poster_path,
+            "actors": []
+        })
         return response
     except HTTPException as err:
         raise err
