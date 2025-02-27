@@ -1,5 +1,5 @@
 from sqlalchemy.orm import relationship
-from database.mysql_connection import Base, engine
+from database.mysql_connection import Base
 from sqlalchemy import Column, Integer, String, ForeignKey, DateTime, Float, Boolean
 
 
